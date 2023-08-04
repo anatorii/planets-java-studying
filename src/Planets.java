@@ -1,149 +1,107 @@
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 
 public class Planets {
+    static double arcLength;
+    static HashMap<String, String[]> planets;
+    static int width = 1000;
+    static int height = 1000;
     public static void main(String[] args) throws IOException {
+        arcLength = 50 * 2 * Math.PI / 24;
+
+        planets = new HashMap<String, String[]>();
+        planets.put("merc", new String[]{"140"});
+        planets.put("venus", new String[]{"190"});
+        planets.put("earth", new String[]{"240"});
+        planets.put("mars", new String[]{"290"});
+        planets.put("jupiter", new String[]{"340"});
+        planets.put("saturn", new String[]{"390"});
+        planets.put("uranus", new String[]{"440"});
+        planets.put("neptune", new String[]{"490"});
+
         new MainWindow();
     }
 }
 
 class MainWindow extends JFrame {
-
-    MainPanel panel;
-
     public MainWindow () throws IOException {
         super("planets");
 
-        panel = new MainPanel();
-        panel.addComponentListener(new MainPanelListener());
-
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        this.setPreferredSize(new Dimension(800, 600));
-
-        this.setLocation(100, 60);
+        Dimension d = Toolkit.getDefaultToolkit().getScreenSize();
+        this.setPreferredSize(new Dimension(Planets.width, Planets.height));
+        this.setLocation((d.width - Planets.width) / 2, (d.height - Planets.height) / 2);
+        this.getContentPane().setLayout(null);
+        this.getContentPane().setBackground(Color.black);
 
         this.pack();
 
         this.setVisible(true);
 
-        this.add(panel);
+        // adding the sun label
+        PlanetLabel planet = new PlanetLabel(this, ImageIO.read(new File("./planets/sun.png")), 0);
+        planet.setPosition(getWidth() / 2, getHeight() / 2);
 
-        Timer timer = new Timer(100, new PaintPanelListener(panel));
-        timer.start();
+        for (String key : Planets.planets.keySet()) {
+            (new OrbitPlanet(
+                    new PlanetLabel(this,
+                            ImageIO.read(new File("./planets/" + key + ".png")),
+                            Integer.parseInt(Planets.planets.get(key)[0])
+                    )
+            )).start();
+        }
     }
 }
 
-class MainPanel extends JPanel {
-    BufferedImage sunImg;
-    boolean init;
-    double arcLength;
-    int xc, yc;
-    HashMap<String, double[]> planets;
-    HashMap<String, BufferedImage> images;
+class OrbitPlanet extends Thread {
+    double angle = 0;
+    PlanetLabel planet;
+    public OrbitPlanet(PlanetLabel planet) {
+        this.planet = planet;
+    }
 
-    public MainPanel() {
+    @Override
+    public void run() {
+        super.run();
+
+        for (;;) {
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
+
+            angle += Planets.arcLength * 360.0 / (planet.radius * 2.0 * Math.PI);
+            int xc = planet.frame.getWidth() / 2;
+            int yc = planet.frame.getHeight() / 2;
+            int x = (int) (xc + planet.radius * Math.cos(angle * Math.PI / 180));
+            int y = (int) (yc + planet.radius * Math.sin(angle * Math.PI / 180));
+            planet.setPosition(x, y);
+        }
+    }
+}
+
+class PlanetLabel extends JLabel {
+    JFrame frame;
+    BufferedImage image;
+    int radius;
+
+    public PlanetLabel(JFrame frame, BufferedImage image, int radius) {
         super();
-
-        init = false;
-
-        try {
-            images = new HashMap<String, BufferedImage>();
-            images.put("merc", ImageIO.read(new File("merc.png")));
-            images.put("venus", ImageIO.read(new File("venus.png")));
-            images.put("earth", ImageIO.read(new File("earth.png")));
-            images.put("mars", ImageIO.read(new File("mars.png")));
-            images.put("jupiter", ImageIO.read(new File("jupiter.png")));
-            images.put("saturn", ImageIO.read(new File("saturn.png")));
-            images.put("uranus", ImageIO.read(new File("uranus.png")));
-            images.put("neptune", ImageIO.read(new File("neptune.png")));
-            sunImg = ImageIO.read(new File("sun.png"));
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        planets = new HashMap<String, double[]>();
-        planets.put("merc", new double[]{100, 0});
-        planets.put("venus", new double[]{150, 0});
-        planets.put("earth", new double[]{200, 0});
-        planets.put("mars", new double[]{250, 0});
-        planets.put("jupiter", new double[]{300, 0});
-        planets.put("saturn", new double[]{350, 0});
-        planets.put("uranus", new double[]{400.0, 0.0});
-        planets.put("neptune", new double[]{450.0, 0.0});
+        this.radius = radius;
+        this.image = image;
+        this.frame = frame;
+        this.setIcon(new ImageIcon(this.image));
+        frame.add(this);
     }
 
-    public void initDimensions() {
-        arcLength = 100 * 2 * Math.PI / 24;
-        xc = getWidth() / 2;
-        yc = getHeight() / 2;
-        init = true;
-    }
-
-    @Override
-    protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-
-        if (!init) {
-            initDimensions();
-        }
-
-        buildPicture(g);
-    }
-
-    public void repaintImage() {
-        repaint();
-    }
-
-    protected void drawPlanet(Graphics g, int x, int y, BufferedImage img) {
-        g.drawImage(img, x - img.getWidth() / 2, y - img.getHeight() / 2, this);
-    }
-
-    protected void buildPicture(Graphics g) {
-        g.setColor(Color.BLACK);
-        g.fillRect(0, 0, getWidth(), getHeight());
-
-        g.drawImage(sunImg, xc - sunImg.getWidth() / 2, yc - sunImg.getHeight() / 2, this);
-
-        int x, y;
-        double[] params;
-
-        for (String key : planets.keySet()) {
-            params = planets.get(key);
-            params[1] += arcLength * 360.0 / (params[0] * 2.0 * Math.PI);
-            x = (int) (xc + params[0] * Math.cos(params[1] * Math.PI / 180));
-            y = (int) (yc + params[0] * Math.sin(params[1] * Math.PI / 180));
-            drawPlanet(g, x, y, images.get(key));
-        }
-    }
-}
-
-class PaintPanelListener implements ActionListener {
-    JPanel panel;
-
-    public PaintPanelListener(JPanel panel) {
-        this.panel = panel;
-    }
-
-    @Override
-    public void actionPerformed(ActionEvent e) {
-        ((MainPanel) panel).repaintImage();
-    }
-}
-
-class MainPanelListener extends ComponentAdapter {
-    @Override
-    public void componentResized(ComponentEvent e) {
-        super.componentResized(e);
-        ((MainPanel) e.getComponent()).init = false;
+    public void setPosition(int x, int y) {
+        setBounds(x - image.getWidth() / 2, y - image.getHeight() / 2, image.getWidth(), image.getHeight());
     }
 }
